@@ -12,6 +12,8 @@ from vacuum_map_parser_base.config.size import Sizes
 from vacuum_map_parser_base.config.text import Text
 from vacuum_map_parser_base.map_data import Area, ImageData, MapData, Path, Point, Room, Wall, Zone
 from vacuum_map_parser_base.map_data_parser import MapDataParser
+import vacuum_map_parser_ijai.RobotMap_pb2 as RobotMap
+
 
 from .image_parser import IjaiImageParser
 from .parsing_buffer import ParsingBuffer
@@ -22,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class IjaiMapDataParser(MapDataParser):
     """Ijai map parser."""
-	
+
     FEATURE_ROBOT_STATUS = 0x00000001
     FEATURE_IMAGE = 0x00000002
     FEATURE_HISTORY = 0x00000004
@@ -41,13 +43,13 @@ class IjaiMapDataParser(MapDataParser):
         sizes: Sizes,
         drawables: list[Drawable],
         image_config: ImageConfig,
-        texts: list[Text],
+        texts: list[Text]
     ):
         super().__init__(palette, sizes, drawables, image_config, texts)
+        self.robot_map = RobotMap.RobotMap()
         self._image_parser = IjaiImageParser(palette, image_config, drawables)
 
     def unpack_map(self, raw_encoded: bytes, *args: Any, **kwargs: Any) -> bytes:
-        
         return zlib.decompress(
             decrypt(
                 raw_encoded, 
@@ -59,75 +61,56 @@ class IjaiMapDataParser(MapDataParser):
 
     def parse(self, raw: bytes, *args: Any, **kwargs: Any) -> MapData:
         map_data = MapData(0, 1)
-        buf = ParsingBuffer('header', raw, 0, len(raw))
 
-        buf.get_uint8('id1')
-        buf.get_uint16('magic1')
-        offset1 = buf.get_uint8('offset1') - 1
-        
-        buf.skip('unknown_hdr1', offset1)
-        _LOGGER.debug(f"Skipping {offset1} bytes, value: {buf.data[buf.offs]:#x}")
-        
-        feature_flags = IjaiMapDataParser.FEATURE_IMAGE
-        map_id = buf.peek_uint32('map_id')
+        self.robot_map.ParseFromString(raw)
 
+        feature_flags = IjaiMapDataParser.FEATURE_IMAGE | IjaiMapDataParser.FEATURE_CHARGE_STATION | IjaiMapDataParser.FEATURE_REALTIME
 
+        _LOGGER.debug(f"feature_flags = {feature_flags:#x}")
         if feature_flags & IjaiMapDataParser.FEATURE_ROBOT_STATUS != 0:
             IjaiMapDataParser.parse_section(buf, 'robot_status', map_id)
-            buf.skip('unknown1', 0x28)
 
         if feature_flags & IjaiMapDataParser.FEATURE_IMAGE != 0:
-            buf.set_name('image')
-            IjaiMapDataParser._parse_section(buf, "image", map_id)
-            map_data.image, map_data.rooms, map_data.cleaned_rooms = self._parse_image(buf)
+            map_data.image, map_data.rooms, map_data.cleaned_rooms = self._parse_image()
 
         if feature_flags & IjaiMapDataParser.FEATURE_HISTORY != 0:
-            IjaiMapDataParser._parse_section(buf, "history", map_id)
             map_data.path = IjaiMapDataParser._parse_history(buf)
 
         if feature_flags & IjaiMapDataParser.FEATURE_CHARGE_STATION != 0:
-            IjaiMapDataParser._parse_section(buf, "charge_station", map_id)
-            map_data.charger = IjaiMapDataParser._parse_position(buf, "pos", with_angle=True)
+            pos_info = self.robot_map.chargeStation
+            map_data.charger = Point(x = pos_info.x, y = pos_info.y, a = pos_info.phi * 180 / math.pi)
             _LOGGER.debug("pos: %s", map_data.charger)
 
         if feature_flags & IjaiMapDataParser.FEATURE_RESTRICTED_AREAS != 0:
-            IjaiMapDataParser._parse_section(buf, "restricted_areas", map_id)
             map_data.walls, map_data.no_go_areas = IjaiMapDataParser._parse_restricted_areas(buf)
 
         if feature_flags & IjaiMapDataParser.FEATURE_CLEANING_AREAS != 0:
-            IjaiMapDataParser._parse_section(buf, "cleaning_areas", map_id)
             map_data.zones = IjaiMapDataParser._parse_cleaning_areas(buf)
 
         if feature_flags & IjaiMapDataParser.FEATURE_NAVIGATE != 0:
-            IjaiMapDataParser._parse_section(buf, "navigate", map_id)
             buf.skip("unknown1", 4)
-            map_data.goto = IjaiMapDataParser._parse_position(buf, "pos")
+            map_data.goto = IjaiMapDataParser._parse_position(buf, "pos", with_angle=True)
             value = buf.get_float32("value")
             _LOGGER.debug("pos: %s, value: %f", map_data.goto, value)
 
         if feature_flags & IjaiMapDataParser.FEATURE_REALTIME != 0:
-            IjaiMapDataParser._parse_section(buf, "realtime", map_id)
-            buf.skip("unknown1", 5)
-            map_data.vacuum_position = IjaiMapDataParser._parse_position(buf, "pos", with_angle=True)
+            pos_info = self.robot_map.currentPose
+            map_data.vacuum_position = Point(x = pos_info.x, y = pos_info.y, a = pos_info.phi * 180 / math.pi)
             _LOGGER.debug("pos: %s", map_data.vacuum_position)
 
         if feature_flags & 0x00000800 != 0:
-            IjaiMapDataParser._parse_section(buf, "unknown1", map_id)
             IjaiMapDataParser._parse_unknown_section(buf)
 
         if feature_flags & IjaiMapDataParser.FEATURE_ROOMS != 0 and map_data.rooms is not None:
-            IjaiMapDataParser._parse_section(buf, "rooms", map_id)
             IjaiMapDataParser._parse_rooms(buf, map_data.rooms)
 
         if feature_flags & 0x00002000 != 0:
-            IjaiMapDataParser._parse_section(buf, "unknown2", map_id)
             IjaiMapDataParser._parse_unknown_section(buf)
 
         if feature_flags & 0x00004000 != 0:
-            IjaiMapDataParser._parse_section(buf, "room_outlines", map_id)
             IjaiMapDataParser._parse_room_outlines(buf)
 
-        buf.check_empty()
+        #buf.check_empty()
 
         if map_data.rooms is not None:
             _LOGGER.debug("rooms: %s", [str(room) for number, room in map_data.rooms.items()])
@@ -135,7 +118,7 @@ class IjaiMapDataParser(MapDataParser):
             self._image_generator.draw_map(map_data)
             if map_data.rooms is not None and len(map_data.rooms) > 0 and map_data.vacuum_position is not None:
                 vacuum_position_on_image = IjaiMapDataParser._map_to_image(map_data.vacuum_position)
-                map_data.vacuum_room = IjaiImageParser.get_current_vacuum_room(buf, vacuum_position_on_image)
+                map_data.vacuum_room = IjaiImageParser.get_current_vacuum_room(self.robot_map.mapData.mapData, vacuum_position_on_image)
                 if map_data.vacuum_room is not None:
                     map_data.vacuum_room_name = map_data.rooms[map_data.vacuum_room].name
                 _LOGGER.debug("current vacuum room: %s", map_data.vacuum_room)
@@ -149,18 +132,15 @@ class IjaiMapDataParser(MapDataParser):
     def _image_to_map(x: float) -> float:
         return (x - 400) / 20
 
-    def _parse_image(self, buf: ParsingBuffer) -> tuple[ImageData, dict[int, Room], set[int]]:
-        buf.skip('unknown1', 0x6)
-        image_top = 0
+    def _parse_image(self) -> tuple[ImageData, dict[int, Room], set[int]]:
         image_left = 0
-        image_width = buf.get_uint16_remove_parity('image_width')
-        buf.skip('unknown2', 1)
-        image_height = buf.get_uint16_remove_parity('image_height')
-        buf.skip('unknown3', 0x21)
+        image_top = 0
+        image_width = self.robot_map.mapHead.sizeX
+        image_height = self.robot_map.mapHead.sizeY
         image_size = image_height * image_width
         _LOGGER.debug("width: %d, height: %d", image_width, image_height)
-        buf.mark_as_image_beginning()
-        image, rooms_raw, cleaned_areas, cleaned_areas_layer = self._image_parser.parse(buf, image_width, image_height)
+        #buf.mark_as_image_beginning()
+        image, rooms_raw, cleaned_areas, cleaned_areas_layer = self._image_parser.parse(self.robot_map.mapData.mapData, image_width, image_height)
         if image is None:
             image = self._image_generator.create_empty_map_image()
         _LOGGER.debug("img: number of rooms: %d, numbers: %s", len(rooms_raw), rooms_raw.keys())
@@ -270,25 +250,11 @@ class IjaiMapDataParser(MapDataParser):
             _LOGGER.debug("room#%d: segment_count: %d", room_id, segment_count)
 
     @staticmethod
-    def _parse_section(buf: ParsingBuffer, name: str, map_id: int) -> None:
-        buf.set_name(name)
-        magic = buf.get_uint32("magic")
-        if magic != map_id:
-            raise ValueError(
-                f"error parsing section {name} at offset {buf.offs - 4:#x}: magic check failed. "
-                + f"Magic: {magic:#x}, Map ID: {map_id:#x}"
-            )
-
-    @staticmethod
-    def _parse_position(buf: ParsingBuffer, name: str, with_angle: bool = False) -> Point | None:
-        x = buf.get_float32(name + ".x")
-        y = buf.get_float32(name + ".y")
-        if IjaiMapDataParser.POSITION_UNKNOWN in (x, y):
-            return None
+    def _parse_position(pose_info: RobotMap.RobotMap.DevicePoseDataInfo, name: str, with_angle: bool = False) -> Point | None:
         a = None
         if with_angle:
-            a = buf.get_float32(name + ".a") * 180 / math.pi
-        return Point(x, y, a)
+            a = pose_info.phi * 180 / math.pi
+        return Point(pose_info.x, pose_info.y, a)
 
     @staticmethod
     def _parse_unknown_section(buf: ParsingBuffer) -> bool:
