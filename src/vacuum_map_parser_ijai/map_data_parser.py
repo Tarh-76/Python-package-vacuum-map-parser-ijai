@@ -36,7 +36,8 @@ class IjaiMapDataParser(MapDataParser):
     FEATURE_ROOMS = 0x00001000
 
     POSITION_UNKNOWN = 1100
-
+    robot_map = RobotMap.RobotMap()
+    
     def __init__(
         self,
         palette: ColorsPalette,
@@ -46,7 +47,7 @@ class IjaiMapDataParser(MapDataParser):
         texts: list[Text]
     ):
         super().__init__(palette, sizes, drawables, image_config, texts)
-        self.robot_map = RobotMap.RobotMap()
+        
         self._image_parser = IjaiImageParser(palette, image_config, drawables)
 
     def unpack_map(self, raw_encoded: bytes, *args: Any, **kwargs: Any) -> bytes:
@@ -62,9 +63,12 @@ class IjaiMapDataParser(MapDataParser):
     def parse(self, raw: bytes, *args: Any, **kwargs: Any) -> MapData:
         map_data = MapData(0, 1)
 
-        self.robot_map.ParseFromString(raw)
+        IjaiMapDataParser.robot_map.ParseFromString(raw)
 
-        feature_flags = IjaiMapDataParser.FEATURE_IMAGE | IjaiMapDataParser.FEATURE_CHARGE_STATION | IjaiMapDataParser.FEATURE_REALTIME
+        feature_flags = IjaiMapDataParser.FEATURE_IMAGE \
+            | IjaiMapDataParser.FEATURE_CHARGE_STATION \
+            | IjaiMapDataParser.FEATURE_REALTIME \
+            | IjaiMapDataParser.FEATURE_HISTORY
 
         _LOGGER.debug(f"feature_flags = {feature_flags:#x}")
         if feature_flags & IjaiMapDataParser.FEATURE_ROBOT_STATUS != 0:
@@ -74,7 +78,7 @@ class IjaiMapDataParser(MapDataParser):
             map_data.image, map_data.rooms, map_data.cleaned_rooms = self._parse_image()
 
         if feature_flags & IjaiMapDataParser.FEATURE_HISTORY != 0:
-            map_data.path = IjaiMapDataParser._parse_history(buf)
+            map_data.path = IjaiMapDataParser._parse_history()
 
         if feature_flags & IjaiMapDataParser.FEATURE_CHARGE_STATION != 0:
             pos_info = self.robot_map.chargeStation
@@ -170,15 +174,11 @@ class IjaiMapDataParser(MapDataParser):
         )
 
     @staticmethod
-    def _parse_history(buf: ParsingBuffer) -> Path:
+    def _parse_history() -> Path:
         path_points = []
-        buf.skip("unknown1", 4)
-        history_count = buf.get_uint32("history_count")
-        for _ in range(history_count):
-            buf.get_uint8("mode")  # 0: taxi, 1: working
-            position = IjaiMapDataParser._parse_position(buf, "path")
-            if position is not None:
-                path_points.append(position)
+        for pt in IjaiMapDataParser.robot_map.historyPose.points:
+            # 0: taxi, 1: working
+            path_points.append(Point(x = pt.x, y = pt.y))
         return Path(len(path_points), 1, 0, [path_points])
 
     @staticmethod
