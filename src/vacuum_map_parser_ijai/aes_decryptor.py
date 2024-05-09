@@ -40,6 +40,8 @@ def md5key(string: str, model: str, device_mac: str):
         tempModel = "00" + tempModel
     elif len(tempModel) == 3:
         tempModel = "0" + tempModel
+    elif len(tempModel) > 4:
+        tempModel = tempModel[-4:]
         
     tempKey = pjstr + tempModel
     aeskey = aes_encrypt(string, tempKey)

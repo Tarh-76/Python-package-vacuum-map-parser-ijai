@@ -11,8 +11,6 @@ from vacuum_map_parser_base.config.drawable import Drawable
 from vacuum_map_parser_base.config.image_config import ImageConfig
 from vacuum_map_parser_base.map_data import Point
 
-from .parsing_buffer import ParsingBuffer
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -41,7 +39,6 @@ class IjaiImageParser:
     def parse(
         self, map_data: bytes, width: int, height: int
     ) -> tuple[ImageType | None, dict[int, tuple[int, int, int, int]], set[int], ImageType | None]:
-        buf = ParsingBuffer("MapImage", map_data, start_offs = 0, length = width * height)
         rooms = {}
         cleaned_areas = set()
         _LOGGER.debug(f"ijai parser: image_config = {self._image_config}")
@@ -63,14 +60,12 @@ class IjaiImageParser:
             cleaned_areas_layer = Image.new("RGBA", (trimmed_width, trimmed_height))
             cleaned_areas_pixels = cleaned_areas_layer.load()
         _LOGGER.debug(f"trim_bottom = {trim_bottom}, trim_top = {trim_top}, trim_left = {trim_left}, trim_right = {trim_right}")
-        buf.skip('trim_bottom', trim_bottom * width)
         unknown_pixels = set()
         for img_y in range(trimmed_height):
-            buf.skip('trim_left', trim_left)
             for img_x in range(trimmed_width):
-                pixel_type = buf.get_uint8('pixel')
                 x = img_x
                 y = trimmed_height - 1 - img_y
+                pixel_type = map_data[(img_y + trim_bottom)*width + x + trim_left]
                 if pixel_type in self.color_map.keys():
                     pixels[x, y] = self.color_map[pixel_type]
                 elif IjaiImageParser.MAP_ROOM_MIN <= pixel_type <= IjaiImageParser.MAP_SELECTED_ROOM_MAX:
@@ -95,8 +90,6 @@ class IjaiImageParser:
                     pixels[x, y] = IjaiImageParser.get_color(SupportedColor.UNKNOWN)
                     unknown_pixels.add(pixel_type)
                     _LOGGER.debug(f"unknown pixel [{x},{y}] = {pixel_type}")
-            buf.skip('trim_right', trim_right)
-        buf.skip('trim_top', trim_top * width)
         if self._image_config.scale != 1 and trimmed_width != 0 and trimmed_height != 0:
             image = image.resize((int(trimmed_width * scale), int(trimmed_height * scale)), resample=Resampling.NEAREST)
             if draw_cleaned_area:
@@ -108,9 +101,8 @@ class IjaiImageParser:
 
     @staticmethod
     def get_current_vacuum_room(map_data: bytes, vacuum_position_on_image: Point) -> int | None:
-        buf = ParsingBuffer("MapImage", map_data, start_offs = 0, length = 800 * 800)
         _LOGGER.debug(f"pos on image: {vacuum_position_on_image}")
-        pixel_type = buf.get_at_image(int(vacuum_position_on_image.y) * 800 + int(vacuum_position_on_image.x))
+        pixel_type = map_data[int(vacuum_position_on_image.y) * 800 + int(vacuum_position_on_image.x)]
         if IjaiImageParser.MAP_ROOM_MIN <= pixel_type <= IjaiImageParser.MAP_ROOM_MAX:
             return pixel_type
         if IjaiImageParser.MAP_SELECTED_ROOM_MIN <= pixel_type <= IjaiImageParser.MAP_SELECTED_ROOM_MAX:
