@@ -54,6 +54,48 @@ _NON_STANDARD_STATUS_PROP = [
     )
 ]
 
+_IsEncryptKeyTypeHex_Models = [
+    "v1",
+    "v2",
+    "v3",
+    "v13",
+    "v15",
+    "v17",
+    "v18",
+    "v19",
+    "sz02",  # unknown model
+    "c101",
+    "c103",
+    "c104",
+    "c101eu",
+    "b106eu",
+    "b106tr",
+]
+
+_K3_Models = [
+    "v13",
+    "v14",
+    "v15",
+    "v17",
+    "v18",
+    "v19",
+    "v21",
+    "sz02",  # unknown model
+    "c101",
+    "c103",
+    "c104",
+    "b106eu",
+    "b106tr",
+]
+
+
+def is_K3_model(model: str):
+    return model.split(".")[-1].lower() in _K3_Models
+
+
+def is_EncryptKeyTypeHex_model(model: str):
+    return model.split(".")[-1].lower() in _IsEncryptKeyTypeHex_Models
+
 
 def get_status_mapping(model: str) -> IjaiVacuumStatusMapping:
     return next((mapping for models,

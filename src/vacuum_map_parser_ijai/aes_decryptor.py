@@ -7,7 +7,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import MD5
 from Crypto.Util.Padding import pad, unpad
 
-isEncryptKeyTypeHex = True
+from status_mapping import is_EncryptKeyTypeHex_model
 
 
 def aes_encrypt(data: str, key: str) -> str:
@@ -20,7 +20,7 @@ def aes_encrypt(data: str, key: str) -> str:
     return encryptedBase64Str
 
 
-def aes_decrypt(data: bytes, key: str) -> bytes:
+def aes_decrypt(data: bytes, key: str, isEncryptKeyTypeHex: bool) -> bytes:
     parsedKey = key.encode("utf-8")
     if isEncryptKeyTypeHex:
         parsedKey = bytes.fromhex(key)
@@ -34,7 +34,7 @@ def aes_decrypt(data: bytes, key: str) -> bytes:
     return bytes.fromhex(decryptedData.decode("utf-8"))
 
 
-def md5key(string: str, model: str, device_mac: str) -> str:
+def md5key(string: str, model: str, device_mac: str, isEncryptKeyTypeHex: bool) -> str:
     pjstr = "".join(device_mac.lower().split(":"))
 
     tempModel = model.split('.')[-1]
@@ -55,15 +55,24 @@ def md5key(string: str, model: str, device_mac: str) -> str:
     return temp[8:-8].upper()
 
 
-def gen_md5_key(wifi_info_sn: str, owner_id: str, device_id: str, model: str, device_mac: str) -> str:
+def gen_md5_key(wifi_info_sn: str, owner_id: str,
+                device_id: str, model: str,
+                device_mac: str, isEncryptKeyTypeHex: bool) -> str:
     arr = [wifi_info_sn, owner_id, device_id]
     tempString = '+'.join(arr)
-    return md5key(tempString, model, device_mac)
+    return md5key(tempString, model, device_mac, isEncryptKeyTypeHex)
 
 
-def decrypt(data: bytes, wifi_info_sn: str, owner_id: str, device_id: str, model: str, device_mac: str) -> bytes:
+def decrypt(data: bytes, wifi_info_sn: str,
+            owner_id: str, device_id: str,
+            model: str, device_mac: str) -> bytes:
     try:
         data = base64.b64decode(data, validate=True)
     except binascii.Error:
         pass
-    return aes_decrypt(data, gen_md5_key(wifi_info_sn, owner_id, device_id, model, device_mac))
+    key_type_hex = is_EncryptKeyTypeHex_model(model)
+    return aes_decrypt(data,
+                       gen_md5_key(wifi_info_sn, owner_id,
+                                   device_id, model,
+                                   device_mac, key_type_hex),
+                       key_type_hex)
