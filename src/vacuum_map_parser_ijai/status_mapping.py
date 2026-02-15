@@ -89,11 +89,11 @@ _K3_Models = [
 ]
 
 
-def is_K3_model(model: str):
+def is_K3_model(model: str) -> bool:
     return model.split(".")[-1].lower() in _K3_Models
 
 
-def is_EncryptKeyTypeHex_model(model: str):
+def is_EncryptKeyTypeHex_model(model: str) -> bool:
     return model.split(".")[-1].lower() in _IsEncryptKeyTypeHex_Models
 
 
