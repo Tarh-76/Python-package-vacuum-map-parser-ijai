@@ -5,7 +5,7 @@ version = "0.0.0"
 license = "Apache-2.0"
 description = "Functionalities for Ijai vacuum map parsing"
 readme = "README.md"
-authors = ["Alexander Vassilyevsky <tarh_@mail.ru>"]
+authors = ["maksp86 <maksp@gsqd.ru>", "Alexander Vassilyevsky <tarh_@mail.ru>"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -13,22 +13,22 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Home Automation",
 ]
-packages = [
-    { include = "vacuum_map_parser_ijai", from = "src" },
-]
+packages = [{ include = "vacuum_map_parser_ijai", from = "src" }]
 
 [tool.poetry.urls]
-"Homepage" = "https://github.com/Tarh-76/Python-package-vacuum-map-parser-ijai"
-"Repository" = "https://github.com/Tarh-76/Python-package-vacuum-map-parser-ijai"
-"Bug Tracker" = "https://github.com/Tarh-76/Python-package-vacuum-map-parser-ijai/issues"
-"Changelog" = "https://github.com/Tarh-76/Python-package-vacuum-map-parser-ijai/releases"
+"Homepage" = "https://github.com/maksp86/Python-package-vacuum-map-parser-ijai"
+"Repository" = "https://github.com/maksp86/Python-package-vacuum-map-parser-ijai"
+"Bug Tracker" = "https://github.com/maksp86/Python-package-vacuum-map-parser-ijai/issues"
+"Changelog" = "https://github.com/maksp86/Python-package-vacuum-map-parser-ijai/releases"
 
 [tool.poetry.dependencies]
 python = "^3.11"
 Pillow = "*"
-vacuum-map-parser-base = "0.1.2"
+pycryptodome = "*"
 
-[tool.poetry.dev-dependencies]
+vacuum-map-parser-base = ">=0.1.5"
+
+[tool.poetry.group.dev.dependencies]
 black = "*"
 mypy = "*"
 ruff = "*"
@@ -45,6 +45,12 @@ line_length = 120
 
 [tool.mypy]
 platform = "linux"
+exclude = '''(?x)
+    ( ^.*RobotMap_pb2\.py$
+    | ^.*RobotMap_pb2\.pyi$
+    | ^.*beautify_min\.py$
+    )
+'''
 
 check_untyped_defs = true
 disallow_any_generics = true
@@ -64,7 +70,18 @@ warn_unused_configs = true
 warn_unused_ignores = true
 
 [tool.pylint]
-disable = ["C0103", "C0116", "R0902", "R0903", "R0912", "R0913", "R0914", "R0915", "W0640"]
+disable = [
+    "C0103",
+    "C0116",
+    "R0902",
+    "R0903",
+    "R0912",
+    "R0913",
+    "R0914",
+    "R0915",
+    "W0640",
+    "R0917",
+]
 max-line-length = 120
 
 [build-system]

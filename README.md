@@ -1,3 +1,15 @@
+[![GitHub Latest Release][releases_shield]][latest_release] 
+[![PyPI][pypi_releases_shield]][pypi_latest_release]
+[![PyPI - Downloads][pypi_downloads_shield]][pypi_downloads]
+
+[latest_release]: https://github.com/maksp86/Python-package-vacuum-map-parser-ijai/releases/latest
+[releases_shield]: https://img.shields.io/github/v/release/maksp86/Python-package-vacuum-map-parser-ijai
+
+[pypi_latest_release]: https://pypi.org/project/vacuum-map-parser-ijai/
+[pypi_releases_shield]: https://img.shields.io/pypi/v/vacuum-map-parser-ijai
+
+[pypi_downloads]: https://pepy.tech/project/vacuum-map-parser-ijai
+[pypi_downloads_shield]: https://static.pepy.tech/badge/vacuum-map-parser-ijai
 
 # Vacuum map parser - Ijai
 
@@ -36,6 +48,13 @@ unpacked_map = parser.unpack_map(raw_map,
                                  device_mac='**:**:**:**:**:**')
 parsed_map = parser.parse(unpacked_map)
 ```
+  
+## Supported vacuums:
+- ijai.vacuum.* (at least v1, v2, v3, v10, v13, v18, v19)
+- xiaomi.vacuum.c103
+- xiaomi.vacuum.c104
+- xiaomi.vacuum.b106eu
+*If you got another vacuum to work, please tell us*
 
 ## Special thanks
 

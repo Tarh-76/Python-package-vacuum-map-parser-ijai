@@ -1,0 +1,42 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+
+jobs:
+  code_quality:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - id: black
+            name: Check code with black
+          - id: isort
+            name: Check code with isort
+          - id: pylint
+            name: Check code with pylint
+          - id: mypy
+            name: Check code with mypy
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: "3.11"
+
+      - name: Install workflow dependencies
+        run: |
+          pip install -r .github/workflows/requirements.txt
+
+      - name: Install Python dependencies
+        run: poetry install --no-interaction
+
+      - name: Run ${{ matrix.id }} checks
+        run: poetry run ${{ matrix.id }} src

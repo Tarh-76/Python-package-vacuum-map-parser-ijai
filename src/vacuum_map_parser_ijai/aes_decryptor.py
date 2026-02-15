@@ -1,12 +1,16 @@
+"""Module that provides functions for decrypting a map."""
+
+import base64
+import binascii
+
 from Crypto.Cipher import AES
 from Crypto.Hash import MD5
 from Crypto.Util.Padding import pad, unpad
-import base64
+
+from .status_mapping import is_EncryptKeyTypeHex_model
 
 
-isEncryptKeyTypeHex = True
-
-def aes_encrypt(data, key: str):
+def aes_encrypt(data: str, key: str) -> str:
     cipher = AES.new(key.encode("utf-8"), AES.MODE_ECB)
 
     encryptedData = cipher.encrypt(
@@ -15,7 +19,8 @@ def aes_encrypt(data, key: str):
 
     return encryptedBase64Str
 
-def aes_decrypt(data, key: str):
+
+def aes_decrypt(data: bytes, key: str, isEncryptKeyTypeHex: bool) -> bytes:
     parsedKey = key.encode("utf-8")
     if isEncryptKeyTypeHex:
         parsedKey = bytes.fromhex(key)
@@ -29,7 +34,7 @@ def aes_decrypt(data, key: str):
     return bytes.fromhex(decryptedData.decode("utf-8"))
 
 
-def md5key(string: str, model: str, device_mac: str):
+def md5key(string: str, model: str, device_mac: str) -> str:
     pjstr = "".join(device_mac.lower().split(":"))
 
     tempModel = model.split('.')[-1]
@@ -45,20 +50,29 @@ def md5key(string: str, model: str, device_mac: str):
     aeskey = aes_encrypt(string, tempKey)
 
     temp = MD5.new(aeskey.encode('utf-8')).hexdigest()
-    if isEncryptKeyTypeHex:
+    if is_EncryptKeyTypeHex_model(model):
         return temp
     return temp[8:-8].upper()
 
 
-def gen_md5_key(wifi_info_sn: str, owner_id: str, device_id: str, model: str, device_mac: str):
+def gen_md5_key(wifi_info_sn: str, owner_id: str,
+                device_id: str, model: str,
+                device_mac: str) -> str:
     arr = [wifi_info_sn, owner_id, device_id]
     tempString = '+'.join(arr)
     return md5key(tempString, model, device_mac)
 
 
-def decrypt(data: bytes, wifi_info_sn: str, owner_id: str, device_id: str, model: str, device_mac: str) -> bytes:
+def decrypt(data: bytes, wifi_info_sn: str,
+            owner_id: str, device_id: str,
+            model: str, device_mac: str) -> bytes:
     try:
         data = base64.b64decode(data, validate=True)
-    except:
+    except binascii.Error:
         pass
-    return aes_decrypt(data, gen_md5_key(wifi_info_sn, owner_id, device_id, model, device_mac))
+    key_type_hex = is_EncryptKeyTypeHex_model(model)
+    return aes_decrypt(data,
+                       gen_md5_key(wifi_info_sn, owner_id,
+                                   device_id, model,
+                                   device_mac),
+                       key_type_hex)

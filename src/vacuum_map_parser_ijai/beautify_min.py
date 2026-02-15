@@ -1,6 +1,9 @@
-from vacuum_map_parser_base.map_data import Point
-from vacuum_map_parser_ijai.RobotMap_pb2 import RobotMap
+# pylint: skip-file
 import collections
+
+from vacuum_map_parser_base.map_data import Point
+
+from vacuum_map_parser_ijai.RobotMap_pb2 import RobotMap
 
 
 class BeautifyMap:
@@ -33,7 +36,7 @@ class BeautifyMap:
 
         self.map = tempArray
 
-    def normalizeMap(self):
+    def normalizeMap(self) -> None:
         # normalizing all data to bytes and values suitable for map_data_parser
         for i in range(len(self.map)):
             if self.map[i] < 0:
@@ -45,10 +48,10 @@ class BeautifyMap:
             elif self.map[i] == 40:
                 self.map[i] = 255
 
-    def getMap(self):
+    def getMap(self) -> list[int]:
         return self.map
 
-    def transform(self):
+    def transform(self) -> None:
         non_boundary_noise = []
         self.findRoiMap()
         self.expandBlackRect(4, 4, self.map[0])
@@ -927,7 +930,7 @@ class BeautifyMap:
 
         return scan_line_seed
 
-    def fillInternalObstacles(self):
+    def fillInternalObstacles(self) -> None:
         if (self.tRect["width"] == 0 and self.tRect["height"] == 0):
             self.findRoiMap()
 
